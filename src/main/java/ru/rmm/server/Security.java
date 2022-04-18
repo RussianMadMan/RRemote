@@ -1,6 +1,8 @@
 package ru.rmm.server;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.SecurityProperties;
 import org.springframework.context.annotation.Bean;
@@ -28,11 +30,11 @@ public class Security extends WebSecurityConfigurerAdapter {
       if(ca.getSSLKeyStore() == null){
            http.authorizeRequests()
                 // restrict all requests unless coming from localhost IP4 or IP6
-                  .antMatchers("/**").access("hasIpAddress(\"127.0.0.1\") or hasIpAddress(\"::1\")");
+                  .antMatchers("/admin/*").hasIpAddress("127.0.0.1");
        }else {
            http.authorizeRequests()
-                   .antMatchers("/user/**").hasRole("ROLE_USER")
-                   .antMatchers("/admin/**").access("hasRole(\"ROLE_ADMIN\") or hasIpAddress(\"127.0.0.1\") or hasIpAddress(\"::1\")")
+                   .antMatchers("/user/**").hasRole("USER")
+                   .antMatchers("/admin/**").access("hasRole(\"ADMIN\") or hasIpAddress(\"127.0.0.1\")")
                    .and()
                    .x509()
                    .subjectPrincipalRegex("(.*?)")
@@ -40,6 +42,10 @@ public class Security extends WebSecurityConfigurerAdapter {
        }
     }
 
+    @Bean
+    public static BeanFactoryPostProcessor removeErrorSecurityFilter() {
+        return beanFactory -> ((DefaultListableBeanFactory) beanFactory).removeBeanDefinition("errorPageSecurityInterceptor");
+    }
 
     @Bean
     public UserDetailsService userDetailsService() {

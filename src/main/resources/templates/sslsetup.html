@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -6,6 +6,26 @@
     <title>Title</title>
 </head>
 <body>
-
+    <div>
+        <form id="form" action="#" th:action="@{/admin/ssl}"  >
+            <input type="text" id="domain" name="domain"/>
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />`
+        </form>
+            <button onclick="genSsl()">Сгенерировать</button>
+    </div>
+    <div id="output"></div>
+    <script type="application/javascript">
+        function genSsl(){
+            let form = document.getElementById("form");
+            let output = document.getElementById("output");
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "ssl");
+            xhr.onload = function(event){
+                output.innerHTML= "Результат: " + event.target.response; // raw response
+            }
+            var formData = new FormData(form);
+            xhr.send(formData);
+        }
+    </script>
 </body>
 </html>

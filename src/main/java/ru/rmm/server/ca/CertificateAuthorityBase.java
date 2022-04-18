@@ -95,13 +95,26 @@ public class CertificateAuthorityBase {
         return new CertificateWithKey(certKeyPair.getPrivate(), cert);
     }
 
-    protected void saveToStore(String filename, CertificateWithKey cert) throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException {
+
+
+    protected void saveToStore(String filename, CertificateWithKey cert, boolean withprivate, CertificateWithKey ca) throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException {
         char[] password = storePassword.toCharArray();
         String path = getStorePath(filename);
         KeyStore keyStore = KeyStore.getInstance("PKCS12");
         // Key store expects a load first to initialize.
         keyStore.load(null, password);
-        keyStore.setKeyEntry(filename, cert.privateKey, password, new X509Certificate[]{cert.certificate});
+
+        if(withprivate) {
+            X509Certificate[] chain;
+            if(ca != null){
+                chain = new X509Certificate[]{cert.certificate, ca.certificate};
+            }else{
+                chain = new X509Certificate[]{cert.certificate};
+            }
+            keyStore.setKeyEntry(filename, cert.privateKey, password, chain);
+        }else {
+            keyStore.setCertificateEntry(filename, cert.certificate);
+        }
         try (FileOutputStream store = new FileOutputStream(path)) {
             keyStore.store(store, password);
         }
