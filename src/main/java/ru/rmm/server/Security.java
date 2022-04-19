@@ -1,5 +1,9 @@
 package ru.rmm.server;
 
+import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
@@ -20,6 +24,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.security.web.authentication.WebAuthenticationDetails;
@@ -30,8 +35,13 @@ import ru.rmm.server.ca.CertificateAuthority;
 
 import javax.servlet.http.HttpServletRequest;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
+
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.toList;
 
 
 @EnableWebSecurity
@@ -40,11 +50,12 @@ public class Security extends WebSecurityConfigurerAdapter {
     @Autowired
     CertificateAuthority ca;
 
+    Logger logger = LoggerFactory.getLogger(Security.class);
+
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         if(ca.getSSLKeyStore() == null){
             http.authorizeRequests()
-            // restrict all requests unless coming from localhost IP4 or IP6
             .antMatchers("/admin/*").hasIpAddress("127.0.0.1");
         }else {
             http.authorizeRequests()
@@ -53,23 +64,11 @@ public class Security extends WebSecurityConfigurerAdapter {
                 .antMatchers("/admin/**").access("hasRole(\"ADMIN\")")
                 .and()
                 .x509()
-                .authenticationDetailsSource((AuthenticationDetailsSource<HttpServletRequest, PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails>) context -> {
-                   X509Certificate[] certs = (X509Certificate[])context.getAttribute("javax.servlet.request.X509Certificate");
-                   PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails details;
-                   var clientIP = context.getRemoteAddr();
-                   if(certs!= null) {
-                       details = null;
-                   }else{
-                       if(clientIP.equals("127.0.0.1")){
-                           details = new PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails(context, AuthorityUtils.commaSeparatedStringToAuthorityList("ROLE_ADMIN"));
-                       }else {
-                           details = new PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails(context, Collections.emptyList());
-                       }
-                   }
-                   return details;
-                })
-                .subjectPrincipalRegex("(.*?)")
-                .userDetailsService(userDetailsService());
+                .subjectPrincipalRegex("CN=(.*?)(?:,|$)")
+                .authenticationUserDetailsService(token -> {
+                    var roles = getRolesFromCert((X509Certificate)token.getCredentials());
+                    return new User((String)token.getPrincipal(), "", roles);
+                });
 
        }
     }
@@ -79,8 +78,29 @@ public class Security extends WebSecurityConfigurerAdapter {
         return beanFactory -> ((DefaultListableBeanFactory) beanFactory).removeBeanDefinition("errorPageSecurityInterceptor");
     }
 
-    @Bean
-    public UserDetailsService userDetailsService() {
-        return username -> new User(username, "", AuthorityUtils.commaSeparatedStringToAuthorityList("ROLE_USER"));
+    private List<GrantedAuthority> getRolesFromCert(X509Certificate cert){
+        List<GrantedAuthority> auths = null;
+        try {
+            var x509name = new JcaX509CertificateHolder(cert).getSubject();
+            var rdns = x509name.getRDNs();
+            var OUs = Arrays.stream(rdns).filter(rdn -> rdn.getFirst().getType().equals(BCStyle.OU)).collect(toList());
+            if(OUs.size() == 0){
+                auths = Collections.emptyList();
+                logger.warn("Входящий сертификат не имел OU ({})", cert.toString());
+            }else{
+                var stringRole = OUs.get(0).getFirst().getValue().toString();
+                try {
+                    var role = ClientRoles.valueOf(stringRole);
+                    auths = AuthorityUtils.commaSeparatedStringToAuthorityList(role.name());
+                }catch (Exception ex){
+                    logger.warn("Входящий сертификат имел OU не совместимый с ролями ({})", cert.toString());
+                    auths = Collections.emptyList();
+                }
+            }
+        }catch(Exception ex){
+            logger.error("Ошибка декодирования сертификата клиента", ex);
+            auths = Collections.emptyList();
+        }
+       return auths;
     }
 }

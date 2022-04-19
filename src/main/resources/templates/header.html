@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div class="navbar navbar-inverse navbar-fixed-top" th:fragment="header">
+    <div class="container">
+        <div class="navbar-header">
+            <span th:text="${#authentication.getPrincipal().getUsername()}"></span>
+            <span th:text="${#authentication.getPrincipal().authorities}"></span>
+        </div>
+    </div>
+</div>
+</body>
+</html>

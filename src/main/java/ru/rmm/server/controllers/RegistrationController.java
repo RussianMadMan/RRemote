@@ -28,7 +28,7 @@ public class RegistrationController {
 
     private boolean checkIfPrivileged(HttpServletRequest request){
         boolean privileged;
-        if(request.isUserInRole("ROLE_ADMIN") || request.getRemoteAddr().equals("127.0.0.1")){
+        if(request.isUserInRole("ROLE_ADMIN") || request.getRemoteAddr().equals("127.0.0.1") || request.getRemoteAddr().equals(request.getLocalAddr())){
             privileged = true;
         }else{
             privileged = false;

@@ -114,11 +114,12 @@ public class CertificateAuthority extends CertificateAuthorityBase {
     }
 
     public byte[] storeAsPKCS12(CertificateWithKey cert) throws CAException {
+        loadCA();
         try {
             KeyStore keyStore = KeyStore.getInstance("PKCS12");
             // Key store expects a load first to initialize.
             keyStore.load(null, null);
-            keyStore.setKeyEntry("mycert", cert.privateKey,"12345".toCharArray(), new X509Certificate[]{cert.certificate});
+            keyStore.setKeyEntry("mycert", cert.privateKey,"12345".toCharArray(), new X509Certificate[]{cert.certificate, ca.certificate});
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             keyStore.store(out, "12345".toCharArray());
             return out.toByteArray();
