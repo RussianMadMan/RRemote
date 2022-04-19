@@ -26,7 +26,7 @@ public class EntryPointController {
                 {
                     return new ModelAndView("redirect:/user/");
                 }
-                return new ModelAndView("redirect:/registration");
+                return new ModelAndView("redirect:/reg");
             }
     }
 }

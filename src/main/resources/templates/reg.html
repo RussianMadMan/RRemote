@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <div>
+        <form id="form">
+            <div>
+                <input type="text" id="username" name="username"/>
+                <label for="username">Имя пользователя</label>
+            </div>
+            <div>
+                <select id="role" name="role">
+                    <option th:each="role : ${roles}"
+                            th:value="${role}" th:text="${role}"></option>
+                </select>
+                <label for="role">Тип</label>
+            </div>
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />`
+        </form>
+        <button onclick="genSsl()">Сгенерировать</button>
+
+    </div>
+    <div id="output"></div>
+    <script type="application/javascript">
+        function genSsl(){
+            let form = document.getElementById("form");
+            let output = document.getElementById("output");
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "gencert");
+            xhr.responseType = "blob";
+            xhr.onload = function(event){
+                output.innerHTML= "Результат: " + event.target.status + "<br>"; // raw response
+                if(event.target.status != 200) return;
+                let a = document.createElement("a");
+                a.href = "getcert";
+                a.innerText = "Скачать"
+                output.appendChild(a);
+            }
+            var formData = new FormData(form);
+            xhr.send(formData);
+        }
+    </script>
+</body>
+</html>

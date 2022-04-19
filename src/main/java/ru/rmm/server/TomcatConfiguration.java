@@ -38,9 +38,7 @@ public class TomcatConfiguration {
 
             try{
                 var store = certificateAuthority.getSSLKeyStore();
-                String userDirectory = new File("").getAbsolutePath();
-                var keystore = Paths.get(userDirectory, store);
-                var truststore = Paths.get(userDirectory, certificateAuthority.getTrustStore());
+
                 if(store == null){
                     certificateAuthority.setSLLActive(false);
                     connector.setPort(8080);
@@ -51,12 +49,17 @@ public class TomcatConfiguration {
                     //protocol.setAddress(InetAddress.getLocalHost());
                     protocol.setSSLEnabled(false);
                 }else{
+                    String userDirectory = new File("").getAbsolutePath();
+                    var keystore = Paths.get(userDirectory, store);
+                    var truststore = Paths.get(userDirectory, certificateAuthority.getTrustStore());
                     certificateAuthority.setSLLActive(true);
                     var pass = certificateAuthority.getSSLKeyPass();
-                    connector.setPort(8443);
+                    connector.setPort(443);
                     connector.setScheme("https");
                     connector.setSecure(true);
+
                     Http11NioProtocol protocol = (Http11NioProtocol) connector.getProtocolHandler();
+                    protocol.setSSLVerifyClient("optional");
                     protocol.setSSLEnabled(true);
                     protocol.setKeystoreType("PKCS12");
                     protocol.setKeystoreFile(keystore.toString());

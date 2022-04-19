@@ -1,10 +1,12 @@
 package ru.rmm.server;
 
 public enum ClientRoles {
-    ROLE_UNKNOWN("0"), ROLE_USER("user"), ROLE_DEVICE("device"), ROLE_CODE("signer");
+    ROLE_USER("USER", false), ROLE_DEVICE("DEVICE", false), ROLE_SIGNER("SIGNER", true), ROLE_ADMIN("ADMIN", true);
     public String role;
-    ClientRoles(String role){
+    public boolean privileged;
+    ClientRoles(String role, boolean privileged){
         this.role = role;
+        this.privileged = privileged;
     }
 
 }

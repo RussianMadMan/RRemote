@@ -2,6 +2,7 @@ package ru.rmm.server.controllers;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.HttpRequestHandler;
@@ -19,7 +20,7 @@ public class AdminController {
     @GetMapping("/admin")
     public String adminPage(){
         if(CertificateAuthority.sslActive) {
-            return null;
+            return "sslsetup";
         }else{
             return "sslsetup";
         }
@@ -35,6 +36,21 @@ public class AdminController {
         }catch(Exception ex){
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ex.getMessage());
         }
+    }
+
+    @GetMapping("/admin/getca")
+    @ResponseBody
+    public ResponseEntity<String> getCACert(){
+        String pem = ca.getPemCACert();
+        if(pem != null){
+            return ResponseEntity.status(HttpStatus.OK).
+                    header("content-disposition", "attachment; filename=\"" + ca.defaultCN +".cer" + "\"").
+                    contentType(MediaType.valueOf("application/x-pem-file")).
+                    body(pem);
+        }else{
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+
     }
 
 }

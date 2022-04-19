@@ -1,6 +1,9 @@
 package ru.rmm.server.ca;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.DERUTF8String;
+import org.bouncycastle.asn1.x500.RDN;
+import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,15 +61,20 @@ public class CertificateAuthorityBase {
 
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
         KeyPair certKeyPair = keyGen.generateKeyPair();
-        String subject = "CN=" + cnName;
-        if(role != null){
-            subject = subject + ",OU=" + role;
+        RDN[] rdns;
+        RDN cn = new RDN(BCStyle.CN, new DERUTF8String(cnName));
+        if(role != null) {
+            RDN ou = new RDN(BCStyle.OU, new DERUTF8String(role));
+            rdns = new RDN[]{cn, ou};
+        }else{
+            rdns = new RDN[]{cn};
         }
-        X500Name name = new X500Name(subject);
+        X500Name name = new X500Name(rdns);
 
         BigInteger serialNumber = new BigInteger(64, new Random(System.currentTimeMillis()));
         Instant validFrom = Instant.now();
-        Instant validUntil = validFrom.plus(10 * 360, ChronoUnit.DAYS);
+        //для сертификатов сервера важно иметь длительность не более 397 дней
+        Instant validUntil = validFrom.plus(domain!=null?396:10*360, ChronoUnit.DAYS); //ChronoUnit.YEARS вызывает исключение "Unsupported unit: Years"
         X500Name issuerName;
         PrivateKey issuerKey;
         if (issuer == null) {
@@ -87,7 +95,7 @@ public class CertificateAuthorityBase {
         }
         if (domain != null) {
             builder.addExtension(Extension.subjectAlternativeName, false,
-                    new GeneralNames(new GeneralName(GeneralName.dNSName, domain)));
+                    new GeneralNames(new GeneralName[]{new GeneralName(GeneralName.dNSName, domain), new GeneralName(GeneralName.iPAddress, domain)}));
         }
         ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").build(issuerKey);
         X509CertificateHolder certHolder = builder.build(signer);
