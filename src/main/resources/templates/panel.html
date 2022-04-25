@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div th:replace="header :: header"></div>
+<div>
+    <div>Тест сообщения <br></div>
+    <form id="form">
+        <div><input id="username" name="username" type="text"><label for="username">Имя пользователя для отправки</label></div>
+        <div><input id="text" name="text" type="text"><label for="username">Текс сообщения</label></div>
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />`
+    </form>
+    <div><button onclick="sendMsg()">Послать</button></div>
+    <div id="output"></div>
+</div>
+
+<script type="application/javascript">
+    function sendMsg(){
+        let form = document.getElementById("form")
+        let out = document.getElementById("output");
+        let data = new FormData(form);
+        let xhr = new XMLHttpRequest();
+        xhr.open("POST", "sendmsg");
+        xhr.onload = (event) =>{
+            out.innerText = event.target.status;
+        }
+        xhr.send(data);
+
+    }
+</script>
+</body>
+</html>

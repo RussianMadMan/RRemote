@@ -32,6 +32,8 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedGrantedAuthoritiesWebAuthenticationDetails;
 import ru.rmm.server.ca.CertificateAuthority;
+import ru.rmm.server.models.MyUserPrincipal;
+import ru.rmm.server.models.RRemoteUserRepo;
 
 import javax.servlet.http.HttpServletRequest;
 import java.security.cert.X509Certificate;
@@ -50,6 +52,9 @@ public class Security extends WebSecurityConfigurerAdapter {
     @Autowired
     CertificateAuthority ca;
 
+    @Autowired
+    RRemoteUserRepo repo;
+
     Logger logger = LoggerFactory.getLogger(Security.class);
 
     @Override
@@ -60,23 +65,24 @@ public class Security extends WebSecurityConfigurerAdapter {
         }else {
             http.authorizeRequests()
                 .antMatchers("/reg").permitAll()
-                .antMatchers("/user/**").hasRole("USER")
+                .antMatchers("/user/**").access("hasRole(\"USER\")")
                 .antMatchers("/admin/**").access("hasRole(\"ADMIN\")")
+                .antMatchers("/test/**/*").access("hasRole(\"DEVICE\")")
                 .and()
                 .x509()
                 .subjectPrincipalRegex("CN=(.*?)(?:,|$)")
                 .authenticationUserDetailsService(token -> {
                     var roles = getRolesFromCert((X509Certificate)token.getCredentials());
-                    return new User((String)token.getPrincipal(), "", roles);
+                    var username = (String)token.getPrincipal();
+                    var user = repo.findByUsername(username);
+                    if(user == null)
+                        throw new UsernameNotFoundException(username);
+                    return new MyUserPrincipal(user, roles);
                 });
 
        }
     }
 
-    @Bean
-    public static BeanFactoryPostProcessor removeErrorSecurityFilter() {
-        return beanFactory -> ((DefaultListableBeanFactory) beanFactory).removeBeanDefinition("errorPageSecurityInterceptor");
-    }
 
     private List<GrantedAuthority> getRolesFromCert(X509Certificate cert){
         List<GrantedAuthority> auths = null;

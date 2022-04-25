@@ -10,4 +10,6 @@ public class CAConfiguration {
     CertificateAuthority getCertificateAuthority(){
         return new CertificateAuthority();
     }
+
+
 }

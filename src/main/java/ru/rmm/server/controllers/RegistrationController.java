@@ -15,9 +15,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import ru.rmm.server.ClientRoles;
 import ru.rmm.server.ca.CertificateAuthority;
 import ru.rmm.server.ca.CertificateWithKey;
+import ru.rmm.server.models.RRemoteUser;
+import ru.rmm.server.models.RRemoteUserRepo;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.Arrays;
+import java.util.Collections;
 
 import static java.util.stream.Collectors.toList;
 
@@ -47,10 +50,17 @@ public class RegistrationController {
     @Autowired
     CertificateAuthority ca;
 
+    @Autowired
+    RRemoteUserRepo repo;
+
     @PostMapping("/gencert")
-    public ResponseEntity<byte[]> generateUserCert(HttpServletRequest request, @RequestParam String username, @RequestParam String role) {
+    public ResponseEntity<String> generateUserCert(HttpServletRequest request, @RequestParam String username, @RequestParam String role) {
         boolean pr = checkIfPrivileged(request);
         try{
+            var check = repo.findByUsername(username);
+            if(check != null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Пользователь с таким именем уже существует");
+            }
             var actualRole = ClientRoles.valueOf(role);
             if(!(!actualRole.privileged || pr)){
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
@@ -58,10 +68,15 @@ public class RegistrationController {
             CertificateWithKey cert = ca.generateCertificateAndKey(username, actualRole);
             byte[] store = ca.storeAsPKCS12(cert);
             request.getSession().setAttribute("New-Cert", store);
-            return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.APPLICATION_OCTET_STREAM).body(null);
+            RRemoteUser user = new RRemoteUser();
+            user.username = username;
+            user.type = actualRole;
+            user.friends = Collections.emptySet();
+            repo.save(user);
+            return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.APPLICATION_OCTET_STREAM).body("ОК");
         }catch(Exception ex){
             logger.error("Ошибка генерации сертификата пользователя", ex);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
 
         }
 

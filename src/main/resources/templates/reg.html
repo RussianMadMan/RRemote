@@ -31,9 +31,8 @@
             let output = document.getElementById("output");
             var xhr = new XMLHttpRequest();
             xhr.open("POST", "gencert");
-            xhr.responseType = "blob";
             xhr.onload = function(event){
-                output.innerHTML= "Результат: " + event.target.status + "<br>"; // raw response
+                output.innerHTML= "Результат: " + event.target.status + " "+ event.target.response?event.target.response:"" + "<br>"; // raw response
                 if(event.target.status != 200) return;
                 let a = document.createElement("a");
                 a.href = "getcert";
