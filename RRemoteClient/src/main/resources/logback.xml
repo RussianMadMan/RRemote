@@ -1,0 +1,22 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <logger name="org.eclipse.jetty">
+        <level value="INFO"/>
+    </logger>
+    <logger name="org.eclipse.jetty.client">
+        <level value="WARN"/>
+    </logger>
+    <logger name="org.eclipse.websocket">
+        <level value="DEBUG"/>
+    </logger>
+    <logger name="ru.rmm.rremote">
+        <level value="DEBUG"/>
+    </logger>
+    <root level="DEBUG">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>

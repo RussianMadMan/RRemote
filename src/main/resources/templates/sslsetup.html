@@ -10,7 +10,7 @@
     <div>
         <form id="form" action="#" th:action="@{/admin/ssl}"  >
             <input type="text" id="domain" name="domain"/>
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />`
+
         </form>
             <button onclick="genSsl()">Сгенерировать</button>
             <a href="/admin/getca">Скачать корневой сертифкат</a>

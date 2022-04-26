@@ -1,9 +1,15 @@
 package ru.rmm.rremote.client;
 
 
+import ch.qos.logback.core.net.ssl.SSL;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.Options;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import org.springframework.messaging.simp.stomp.*;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
@@ -33,115 +39,76 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.prefs.Preferences;
 
 public class RemoteClient{
-
+    private static final Logger logger = LoggerFactory.getLogger(RemoteClient.class);
     public static void main(String[] args) throws Exception{
+        var opts = genOpts();
+        DefaultParser parser = new DefaultParser();
 
-        var sslContext = createSSLContext();
-        String host = "192.168.168.54";
+        var cml = parser.parse(opts, args);
+        String CMDname = cml.getOptionValue("name");
+        String CMDhost = cml.getOptionValue("host");
+        String optionsHost =  getOptionFromSystem("host");
 
-        final SslContextFactory ssl = new SslContextFactory.Client();
-        ssl.setSslContext(sslContext);
-        HttpClient httpClient = new HttpClient(ssl);
-        WebSocketClient client = new WebSocketClient(httpClient);
-
-        JettyWebSocketClient jettyClient = new JettyWebSocketClient(client);
-        WebSocketStompClient stompClient = new WebSocketStompClient(jettyClient);
-        stompClient.setTaskScheduler(new ConcurrentTaskScheduler());
-        stompClient.start();
-        stompClient.setMessageConverter(new MappingJackson2MessageConverter());
-        String url = "wss://{host}/test";
-        var future = stompClient.connect(url, new StompSessionHandlerAdapter() {
-            @Override
-            public void afterConnected(StompSession session, StompHeaders connectedHeaders) {
-                System.out.println("Connected");
+        String name = CMDname;
+        String host = chooseOption(CMDhost, optionsHost);
+        logger.info("Started with host {} and name {}", host, name);
+        if(host == null){
+            logger.error("No hostname set");
+            return;
+        }
+        if(!SSLManager.isCACertPresent()){
+            logger.error("Нет корневого сертфиката");
+            return;
+        }
+        if(!SSLManager.isDeviceCertPresent()){
+            logger.warn("No client certificate found, trying to register...");
+            if(name == null){
+                logger.error("No client certificate and device name is not set");
+                return;
             }
-
-            @Override
-            public void handleTransportError(StompSession session, Throwable exception) {
-                if(!session.isConnected()){
-
+            try {
+                SSLManager.registerDevice(name, host);
+                //sanity check
+                if(!SSLManager.isDeviceCertPresent()){
+                    logger.error("Registration complete but still no client certificate file found!");
+                    return;
                 }
+            }catch(Exception ex){
+                logger.error("Registration failed with exception", ex);
+                return;
             }
-
-            @Override
-            public void handleException(StompSession session, StompCommand command, StompHeaders headers, byte[] payload, Throwable exception) {
-                System.out.println(String.format("Shat itself %s", exception.toString()));
-            }
-
-        }, host);
-
-
-        var session = future.get();
-
-
-        //session.send("/app/hello", "hello");
-
-        var sub = session.subscribe("/user/queue/device", new StompSessionHandler() {
-
-            @Override
-            public void afterConnected(StompSession session, StompHeaders connectedHeaders) {
-                System.out.println(String.format("afterConnected: %s", connectedHeaders));
-            }
-
-            @Override
-            public void handleException(StompSession session, StompCommand command, StompHeaders headers, byte[] payload, Throwable exception) {
-                System.out.println(String.format("handleException: %s", exception));
-            }
-
-            @Override
-            public void handleTransportError(StompSession session, Throwable exception) {
-                System.out.println(String.format("handleTransportError: %s", exception));
-            }
-
-            @Override
-            public Type getPayloadType(StompHeaders headers) {
-                return ServiceMessage.class;
-            }
-
-            @Override
-            public void handleFrame(StompHeaders headers, Object payload){
-                System.out.println(String.format("Got Message! %s", payload));
-            }
-
-        });
-
-        System.out.println(session.getSessionId());
+        }
+        var context = SSLManager.getSSLContext();
+        RRemoteClientService rremote = new RRemoteClientService(host, context);
+        rremote.addLifecycleEventHandler(event -> logger.info("Lifecycle Event {}", event));
+        rremote.start();
         while(true){
             Thread.sleep(1000);
         }
-
-
     }
 
-    private static SSLContext createSSLContext() throws NoSuchAlgorithmException, KeyStoreException, IOException, UnrecoverableKeyException, KeyManagementException, CertificateException {
+    private static String getOptionFromSystem(String name){
+        Preferences prefs = Preferences.userNodeForPackage(RemoteClient.class);
+        return prefs.get(name, null);
+    }
 
-        String keyStorePath = "device.pfx";
-        String trustStorePath = "RRemote CA.cer";
+    private static String chooseOption(String... args){
+        for(String s : args){
+            if(s != null)
+                return s;
+        }
+        return null;
+    }
 
-        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        KeyStore keystore = KeyStore.getInstance("PKCS12");
-        keystore.load(new FileInputStream(keyStorePath), "12345".toCharArray());
-        kmf.init(keystore, "12345".toCharArray());
-
-        TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        KeyStore truststore = KeyStore.getInstance("PKCS12");
-        truststore.load(null, null);
-        CertificateFactory fact = CertificateFactory.getInstance("X.509");
-        FileInputStream is = new FileInputStream (trustStorePath);
-        X509Certificate cer = (X509Certificate) fact.generateCertificate(is);
-        truststore.setCertificateEntry("ca", cer);
-        tmf.init(truststore);
-
-        SSLContext sslContext = SSLContext.getInstance("TLS");
-        var km = kmf.getKeyManagers();
-        var tm = tmf.getTrustManagers();
-        sslContext.init(km, tm, new SecureRandom());
-        SSLContext.setDefault(sslContext);
-
-
-        return sslContext;
+    private static Options genOpts(){
+        Options opts = new Options();
+        opts.addOption("h", "host", true, "Hostname of RRemote Server" );
+        opts.addOption("n", "name", true, "Name of this device for registration");
+        return opts;
     }
 
 }

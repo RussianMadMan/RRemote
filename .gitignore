@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+/h2.db.trace.db
+/device.pfx
+/device.pfx

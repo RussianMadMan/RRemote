@@ -63,7 +63,7 @@ public class Security extends WebSecurityConfigurerAdapter {
             http.authorizeRequests()
             .antMatchers("/admin/*").hasIpAddress("127.0.0.1");
         }else {
-            http.authorizeRequests()
+            http.csrf().disable().authorizeRequests()
                 .antMatchers("/reg").permitAll()
                 .antMatchers("/user/**").access("hasRole(\"USER\")")
                 .antMatchers("/admin/**").access("hasRole(\"ADMIN\")")
