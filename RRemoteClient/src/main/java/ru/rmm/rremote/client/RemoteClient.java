@@ -1,46 +1,15 @@
 package ru.rmm.rremote.client;
 
 
-import ch.qos.logback.core.net.ssl.SSL;
-import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
-import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.util.ssl.SslContextFactory;
-import org.eclipse.jetty.websocket.client.WebSocketClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.messaging.converter.MappingJackson2MessageConverter;
-import org.springframework.messaging.simp.stomp.*;
-import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
-import org.springframework.web.socket.client.jetty.JettyWebSocketClient;
-import org.springframework.web.socket.messaging.WebSocketStompClient;
-import ru.rmm.rremote.comms.ServiceMessage;
+import ru.rmm.rremote.comms.Service;
 
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManagerFactory;
-import javax.websocket.ClientEndpointConfig;
-import javax.websocket.ContainerProvider;
-import javax.websocket.WebSocketContainer;
-import javax.websocket.server.ServerContainer;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.lang.reflect.Type;
-
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.security.*;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.logging.Level;
 import java.util.prefs.Preferences;
+
+import static ru.rmm.rremote.client.RRemoteClientService.RRemoteLifecycleEvent.Type.CONNECTION_SUCCESS;
 
 public class RemoteClient{
     private static final Logger logger = LoggerFactory.getLogger(RemoteClient.class);
@@ -83,8 +52,20 @@ public class RemoteClient{
             }
         }
         var context = SSLManager.getSSLContext();
+        var secondContext = SSLManager.getSSLContext();
         RRemoteClientService rremote = new RRemoteClientService(host, context);
-        rremote.addLifecycleEventHandler(event -> logger.info("Lifecycle Event {}", event));
+        rremote.addLifecycleEventHandler(event -> {
+            logger.info("Lifecycle Event {}", event);
+            if(event.type.equals(CONNECTION_SUCCESS)){
+                Service testService = new Service("Test Service", new Service.ServiceCommand[]{new Service.ServiceCommand("Test", new String[0])});
+                rremote.announceServices(new Service[]{testService});
+                rremote.setServiceMessageHandler(event1 -> logger.info("Service message {}", event1));
+                var token = rremote.getFriendToken(secondContext);
+                logger.warn("Token: {}", token);
+                var friends = rremote.getFriends(secondContext);
+                logger.warn("Friends: {}", friends);
+            }
+        });
         rremote.start();
         while(true){
             Thread.sleep(1000);

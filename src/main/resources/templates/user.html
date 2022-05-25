@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script type="application/javascript" src="/rremote.js"></script>
+<div th:replace="header :: header"></div>
+<!--/*@thymesVar id="services" type="java.util.List<ru.rmm.server.models.ClientService>"*/-->
+<div th:text="|Подсоединенных устройств: ${services.size()}|"></div>
+<input id="friend-code" type="text"/>
+<label for="friend-code">Код устройства</label>
+<button onclick="addFriend()">Добавить</button>
+<script type="application/javascript">
+    function addFriend(){
+        let input = document.getElementById("friend-code");
+        let token = input.value;
+        let obj = {'token': token};
+        doGetWithObject(obj, "/user/addfriend", console.log);
+    }
+</script>
+<div th:replace="services :: service-panel (${services})"></div>
+</body>
+</html>

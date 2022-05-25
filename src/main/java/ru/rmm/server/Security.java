@@ -67,7 +67,7 @@ public class Security extends WebSecurityConfigurerAdapter {
                 .antMatchers("/reg").permitAll()
                 .antMatchers("/user/**").access("hasRole(\"USER\")")
                 .antMatchers("/admin/**").access("hasRole(\"ADMIN\")")
-                .antMatchers("/test/**/*").access("hasRole(\"DEVICE\")")
+                .antMatchers("/device/**").access("hasRole(\"DEVICE\")")
                 .and()
                 .x509()
                 .subjectPrincipalRegex("CN=(.*?)(?:,|$)")

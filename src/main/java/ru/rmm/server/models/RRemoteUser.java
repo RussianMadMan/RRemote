@@ -1,6 +1,7 @@
 package ru.rmm.server.models;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import ru.rmm.server.ClientRoles;
 
@@ -21,11 +22,13 @@ public class RRemoteUser {
     @Enumerated(EnumType.STRING)
     public ClientRoles type;
 
-    @ManyToMany(fetch = FetchType.LAZY)
+    @ManyToMany(fetch = FetchType.EAGER)
     @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     public Set<RRemoteUser> friends;
 
     @Transient
     @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     public X509Certificate currentCert;
 }

@@ -4,6 +4,7 @@ import ch.qos.logback.core.net.ssl.SSL;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.eclipse.jetty.client.HttpClient;
+
 import org.eclipse.jetty.client.util.MultiPartContentProvider;
 import org.eclipse.jetty.client.util.StringContentProvider;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
@@ -21,15 +22,27 @@ import org.springframework.util.concurrent.ListenableFutureCallback;
 import org.springframework.web.socket.client.jetty.JettyWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 import ru.rmm.rremote.comms.Endpoints;
+import ru.rmm.rremote.comms.Service;
+import ru.rmm.rremote.comms.ServiceAnnounce;
+import ru.rmm.rremote.comms.ServiceMessage;
 
 import javax.crypto.spec.PSource;
+import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
+import java.io.Serializable;
 import java.lang.reflect.Type;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
+
+import static ru.rmm.rremote.comms.Endpoints.DeviceGetFriends;
 
 public class RRemoteClientService {
 
@@ -38,6 +51,9 @@ public class RRemoteClientService {
 
     private WebSocketStompClient stompClient;
     private StompSession session;
+
+    private HttpClient client;
+
 
     private final EventSource<RRemoteLifecycleEvent> lifecycle = new EventSource<>();
     private void call(RRemoteLifecycleEvent event){
@@ -65,16 +81,19 @@ public class RRemoteClientService {
         connectStomp(host);
     }
 
-    public void setServiceMessageHandler(Class type, EventHandler<Object> handler){
-        if(session == null){
-            logger.error("Trying to subscribe without active session");
-            throw new IllegalStateException("No connection");
-        }
-        var stomphandler = new RRemoteSessionHandler(this, handler, type);
+    public void setServiceMessageHandler( EventHandler<ServiceMessage> handler){
+        checkSession("Trying to subscribe without active session");
+        var stomphandler = new RRemoteSessionHandler<ServiceMessage>(this, handler, ServiceMessage.class);
         var sub = session.subscribe(Endpoints.ServiceMessageEndpoint, stomphandler);
     }
-
+    public void announceServices(Service[] services){
+        checkSession("Trying to subscribe without active session");
+        ServiceAnnounce msg = new ServiceAnnounce(services);
+        logger.debug("Announcing {} to {}", services, Endpoints.ServiceAnnounceEndpoint);
+        session.send(Endpoints.ServiceAnnounceEndpoint, msg);
+    }
     public static KeyStore reqisterAtRRemote(String name, String host, SSLContext sslContext) throws Exception {
+
         final SslContextFactory ssl = new SslContextFactory.Client();
         ssl.setSslContext(sslContext);
         HttpClient httpClient = new HttpClient(ssl);
@@ -103,11 +122,53 @@ public class RRemoteClientService {
         return newSSL;
     }
 
+    public String getFriendToken(SSLContext clientCert){
+        checkSession("Trying to generate tokens with no session");
+
+        try {
+            var token = doGet(clientCert, Endpoints.DeviceGenerateToken);
+            return token;
+        }catch (Exception ex){
+            logger.error("Error generating token", ex);
+            return null;
+        }
+    }
+
+    public String[] getFriends(SSLContext clientCert){
+        checkSession("Trying to generate tokens with no session");
+        try{
+            var friends = doGet(clientCert, Endpoints.DeviceGetFriends);
+            if(friends == null)
+                return null;
+            return friends.split("[\r\n]");
+        }catch (Exception ex){
+            logger.error("Error getting friend list", ex);
+            return null;
+        }
+    }
+    private String doGet(SSLContext context, String endpoint) throws Exception {
+        String url = String.format("https://%s%s", host, endpoint);
+        var response = client.GET(url);
+        if(response.getStatus() != 200){
+            logger.error("Error performing HTTP GET to {} {}", url, response.getStatus());
+            return null;
+        }
+        return response.getContentAsString();
+    }
+    private void checkSession(String message){
+        if(session == null){
+            logger.error(message);
+            throw new IllegalStateException("No connection");
+        }
+    }
+
     private void initStomp(SSLContext sslContext){
 
         final SslContextFactory ssl = new SslContextFactory.Client();
         ssl.setSslContext(sslContext);
+
         HttpClient httpClient = new HttpClient(ssl);
+        client = httpClient;
         WebSocketClient client = new WebSocketClient(httpClient);
         JettyWebSocketClient jettyClient = new JettyWebSocketClient(client);
         stompClient = new WebSocketStompClient(jettyClient);
@@ -117,8 +178,8 @@ public class RRemoteClientService {
     }
 
     private void connectStomp(String host){
-        String url = "wss://{host}/test"; //todo change endpoint
-        var future = stompClient.connect(url, new RRemoteSessionHandler(this), host);
+        String url = "wss://{host}/device/wss";
+        var future = stompClient.connect(url, new RRemoteSessionHandler<String>(this), host);
         future.addCallback(new ListenableFutureCallback<StompSession>() {
             @Override
             public void onFailure(Throwable ex) {
@@ -135,10 +196,10 @@ public class RRemoteClientService {
         });
     }
 
-    private class RRemoteSessionHandler extends StompSessionHandlerAdapter {
+    private class RRemoteSessionHandler<T> extends StompSessionHandlerAdapter {
 
         private final RRemoteClientService service;
-        private final EventSource<Object> source = new EventSource<>();
+        private final EventSource<T> source = new EventSource<>();
         private Class type = String.class;
 
 
@@ -146,7 +207,7 @@ public class RRemoteClientService {
             this.service = service;
         }
 
-        public RRemoteSessionHandler(RRemoteClientService service, EventHandler<Object> handler, Class cl){
+        public RRemoteSessionHandler(RRemoteClientService service, EventHandler<T> handler, Class cl){
             this.service = service;
             source.addHandler(handler);
             type = cl;
@@ -159,7 +220,8 @@ public class RRemoteClientService {
 
         @Override
         public void handleFrame(StompHeaders headers, @Nullable Object payload) {
-            source.call(payload);
+            if(payload != null)
+                source.call((T)payload);
         }
 
         @Override

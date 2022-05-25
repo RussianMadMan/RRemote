@@ -5,16 +5,14 @@
     <title>Title</title>
 </head>
 <body>
+<script type="application/javascript" src="/rremote.js"></script>
 <div th:replace="header :: header"></div>
 <div>
-    <div>Тест сообщения <br></div>
-    <form id="form">
-        <div><input id="username" name="username" type="text"><label for="username">Имя пользователя для отправки</label></div>
-        <div><input id="text" name="text" type="text"><label for="username">Текс сообщения</label></div>
 
-    </form>
-    <div><button onclick="sendMsg()">Послать</button></div>
     <div id="output"></div>
+    <div th:replace="services :: service-panel(${services})">
+
+    </div>
 </div>
 
 <script type="application/javascript">

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<!--/*@thymesVar id="clients" type="java.util.List<ru.rmm.server.models.ClientService>"*/-->
+<!--/*@thymesVar id="client" type="ru.rmm.server.models.ClientService"*/-->
+<!--/*@thymesVar id="service" type="ru.rmm.rremote.comms.Service"*/-->
+<!--/*@thymesVar id="command" type="ru.rmm.rremote.comms.Service.ServiceCommand"*/-->
+        <div th:fragment="service-panel (clients)">
+            <script th:inline="javascript">
+                function sendCommand(client, service, command){
+                    var obj = {
+                        "client" : client,
+                        "service" : service,
+                        "command" : command
+                    }
+                    doGetWithObject(obj, "sendmsg", console.log);
+                }
+            </script>
+            <div th:each="client : ${clients}">
+                <div th:text="${client.principal.getName()}"></div>
+
+                <div th:each="service : ${client.services}">
+                    <div th:text="${service.name}"></div>
+                    <div th:each="command : ${service.commands}">
+                        <div th:text="${command.name}"></div>
+                        <div th:each="parameter : ${command.parameters}">
+
+                        </div>
+                        <button th:onclick="sendCommand([[${client.principal.getName()}]], [[${service.name}]], [[${command.name}]])">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+</body>
+</html>

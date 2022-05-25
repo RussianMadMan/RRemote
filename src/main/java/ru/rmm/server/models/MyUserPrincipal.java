@@ -4,7 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 
+import java.security.Principal;
 import java.util.Collection;
 import java.util.Collections;
 
@@ -12,7 +14,10 @@ import java.util.Collections;
 @Data
 @AllArgsConstructor
 public class MyUserPrincipal implements UserDetails {
-
+    public static MyUserPrincipal extract(Principal p){
+        PreAuthenticatedAuthenticationToken token = (PreAuthenticatedAuthenticationToken)p;
+        return (MyUserPrincipal)token.getPrincipal();
+    }
     public RRemoteUser user;
 
     Collection<GrantedAuthority> authorities;
